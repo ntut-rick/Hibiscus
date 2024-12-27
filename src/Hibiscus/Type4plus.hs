@@ -33,6 +33,18 @@ instance Monoid Subst where
 lookup :: (Name a) -> TypeEnv -> Maybe (Type ())
 lookup n env = Map.lookup (void n) env
 
+-- TODO: WIP 
+specialisePolymorphism :: Type () -> Context -> (Context, Type ())
+specialisePolymorphism t = 
+  trace ("applySub: " ++ show sub) $ 
+  fromMaybe t (Map.lookup n sub)
+specialisePolymorphism (TPar _ t) = applySub t
+specialisePolymorphism (TArrow _ ta tb) c0 = TArrow () ta' tb'
+  where
+    (c1, ta') = specialisePolymorphism ta c0
+    (c2, tb') = specialisePolymorphism tb c1
+specialisePolymorphism t c = (c, t)
+
 type Result = Either String
 instance MonadFail Result where
   fail = Left

@@ -24,8 +24,17 @@ data Type a
     | TUnit a
     | TList a (Type a)
     | TArrow a (Type a) (Type a)
+   -- Only used in inferrence:
+    | TPoly a MetaSymbol
     | TUnknown a MetaSymbol
     deriving (Functor, Foldable)
+
+-- WARN: experimantal
+tmap :: (Type a -> Type a) -> Type a -> Type a
+tmap f (TPar a t) = TPar a (f t)
+tmap f (TList a t) = TList a (f t)
+tmap f (TArrow a t1 t2) = TArrow a (f t1) (f t2)
+tmap f t = f t
 
 instance Eq (Type a) where
   (TVar _ n1)        == (TVar _ n2)        = n1 == n2
@@ -43,6 +52,9 @@ instance Show (Type a) where
   show (TList _ t) = "List " ++ show t
   show (TArrow _ ta tb) = show ta ++ " -> " ++ show tb
   show (TUnknown _ s) = "?" ++ show s
+  show (TPoly _ s) = "_" ++ oneToa s
+    where
+      oneToa n = [toEnum (n + 97)] 
 
 data Argument a
     = Argument a (Name a)
