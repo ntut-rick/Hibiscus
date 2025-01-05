@@ -75,6 +75,20 @@ data Config = Config
   -- uniforms :: [Uniform] -- (name, type, position)
   }
 
+
+-- TODO: Replace FunctionType to Thunk
+-- A thunk is a value that is yet to be evaluated.
+-- https://wiki.haskell.org/Thunk
+-- data Thunk
+--   = CustomFunction Asm.OpId String
+--   | Constructor DataType -- function type constructor
+--   | Extractor DataType [Int] -- function type decorator
+--   | Operator (Ast.Op (L.Range, Type))
+--   | Foldl -- base function
+--   | Fmap -- base function
+--   | IfThenElse Expr Expr Expr  -- if, then, else
+--   deriving (Show)
+
 data BaseFunctionType
   = CustomFunction Asm.OpId String
   | TypeConstructor DataType -- function type constructor
