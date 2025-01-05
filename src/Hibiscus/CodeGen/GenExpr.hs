@@ -128,7 +128,7 @@ generateTypeSt_aux2 dType typeId = state $ \state2 ->
       DT.DTypeVector size baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]})
       DT.DTypeMatrix col baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]})
       DT.DTypeArray size baseType ->
-        let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state3
+        let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state3 -- ???: how tf
             arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
             inst3' = inst2{typeFields = typeFields inst2 ++ arrayInst}
          in (state4, inst3')
@@ -291,7 +291,7 @@ generateFunctionSt inst (Ast.Dec (_, t) (Ast.Name _ name) args e) =
     env_state1 <- gets env
 
     let funcId = Asm.IdName (intercalate "_" $ BS.unpack name : map show argsType)
-    let result = ExprApplication (BaseFunction (CustomFunction funcId (BS.unpack name))) (returnType, argsType) []
+    let result = ExprApplication (BaseFunction (FTCustom funcId (BS.unpack name))) (returnType, argsType) []
     er <- insertResultSt (ResultVariableValue (env_state1, BS.unpack name, functionType)) (Just result)
 
 
@@ -384,6 +384,14 @@ handleExtractSt returnType i var@(opId, _) =
     let stackInst = [returnedInstruction returnId (Asm.OpCompositeExtract typeId opId (Asm.ShowList i))]
     return (ExprResult (returnId, returnType), inst, [], stackInst)
 
+handleIndexSt :: DataType -> Variable -> Variable -> State LanxSt VeryImportantTuple
+handleIndexSt returnType (baseId, _) (indexId, _) =
+  do
+    (typeId, inst) <- generateTypeSt returnType
+    returnId <- nextOpId
+    let stackInst = [returnedInstruction returnId (Asm.OpAccessChain typeId baseId (Asm.ShowList [indexId]))]
+    return (ExprResult (returnId, returnType), inst, [], stackInst)
+
 ----- Below are stateless
 
 handleOp' :: Ast.Op (L.Range, Type) -> ExprReturn
@@ -401,7 +409,7 @@ handleOp' op =
         Ast.Ge _ -> (DT.bool, [DT.DTypeUnknown, DT.DTypeUnknown])
         Ast.And _ -> (DT.DTypeUnknown, [DT.DTypeUnknown, DT.DTypeUnknown])
         Ast.Or _ -> (DT.DTypeUnknown, [DT.DTypeUnknown, DT.DTypeUnknown])
-   in ExprApplication (BaseFunction (OperatorFunction op)) funcSign []
+   in ExprApplication (BaseFunction (FTOperator op)) funcSign []
 
 appendApplication :: ExprReturn -> [Variable] -> ExprReturn
 appendApplication (ExprApplication funcType funcSign args) arg = 
@@ -482,11 +490,11 @@ applyExpr (var1, inst1, varInst1, stackInst1) =
     (var2,inst2,varInst2,stackInst2) <-  case var1 of
         ExprResult x ->  return (ExprResult x, mempty,[],[]) -- already evaluated
         ExprApplication funcType (returnType,argsType) args -> case funcType of
-            BaseFunction (CustomFunction id s) -> functionCallSt id returnType args
-            BaseFunction (TypeConstructor t )-> handleConstructorSt t args
-            BaseFunction (TypeExtractor t int )-> handleExtractSt t int (head args)
-            BaseFunction (OperatorFunction op )-> error "Not implemented" -- TODO:
-            BaseFunction FunctionFoldl -> error "Not implemented" -- TODO: eval foldl gen array length
+            BaseFunction (FTCustom id s) -> functionCallSt id returnType args
+            BaseFunction (FTConstructor t )-> handleConstructorSt t args
+            BaseFunction (FTExtractor t int )-> handleExtractSt t int (head args)
+            BaseFunction (FTOperator op )-> error "Not implemented" -- TODO:
+            BaseFunction FTFoldl -> error "Not implemented" -- TODO: eval foldl gen array length
             IfElseApplication condEr thenEr elseEr -> handleIfElseSt condEr thenEr elseEr args
             _ -> error "Not implemented"
     
@@ -532,7 +540,7 @@ generateExprSt (Ast.EVar (_, t1) (Ast.Name _ bsname)) =
 
                   -- doTrace ("after "++ show (env state2)++show (findResult state2 (ResultVariableValue (env state2, name, DTypeFunction returnType args))))
                   -- doTrace (show (idMap state2))
-                  return (ExprApplication (BaseFunction (CustomFunction id name)) (returnType, args) [], inst1, [], [])
+                  return (ExprApplication (BaseFunction (FTCustom id name)) (returnType, args) [], inst1, [], [])
           _ ->
             do
               let ExprResult (varId, varType) = fromMaybe (error ("cant find var:" ++ show (env state, name, dType))) (findResult state (ResultVariable (env state, name, dType)))

@@ -2,23 +2,23 @@
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -w #-}
 
-module Hibiscus.Asm
-  ( Instruction (..),
-    Literal (..),
-    Ops (..),
-    OpId (..),
-    ShowList (..),
-    Capability (..),
-    AddressingModel (..),
-    SourceLanguage (..),
-    StorageClass (..),
-    Decoration (..),
-    FunctionControl (..),
-    MemoryModel (..),
-    ExecutionModel (..),
-    ExecutionMode (..),
-    ResultId,
-  )
+module Hibiscus.Asm (
+  Instruction (..),
+  Literal (..),
+  Ops (..),
+  OpId (..),
+  ShowList (..),
+  Capability (..),
+  AddressingModel (..),
+  SourceLanguage (..),
+  StorageClass (..),
+  Decoration (..),
+  FunctionControl (..),
+  MemoryModel (..),
+  ExecutionModel (..),
+  ExecutionMode (..),
+  ResultId,
+)
 where
 
 data Literal
@@ -164,6 +164,7 @@ data Ops
     OpVariable OpId StorageClass
   | OpLoad ResultType OpId
   | OpStore OpId OpId
+  | OpAccessChain ResultType OpId (ShowList OpId)
   | -- OpFunction
     OpFunction ResultType FunctionControl OpId
   | OpFunctionParameter ResultType
@@ -256,17 +257,17 @@ instance Show Instruction where
       ++ show r
       ++ " "
       ++ ( case l of
-             LBool b -> show b
-             LUint i -> show i
-             LInt i -> show i
-             LFloat f -> show f
+            LBool b -> show b
+            LUint i -> show i
+            LInt i -> show i
+            LFloat f -> show f
          )
   show (Instruction (Nothing, op)) = show op
   show (Instruction (Just res, op)) = show res ++ " = " ++ show op
 
 test :: () -> [Instruction]
 test () =
-  [ Instruction (Nothing, OpTypeFloat 8),
-    Instruction (Just (IdName "name"), OpTypeInt 32 0),
-    Instruction (Just (Id 2), OpTypeInt 16 1)
+  [ Instruction (Nothing, OpTypeFloat 8)
+  , Instruction (Just (IdName "name"), OpTypeInt 32 0)
+  , Instruction (Just (Id 2), OpTypeInt 16 1)
   ]

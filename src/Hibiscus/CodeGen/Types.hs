@@ -76,12 +76,13 @@ data Config = Config
   }
 
 data BaseFunctionType
-  = CustomFunction Asm.OpId String
-  | TypeConstructor DataType -- function type constructor
-  | TypeExtractor DataType [Int] -- function type decorator
-  | OperatorFunction (Ast.Op (L.Range, Type))
-  | FunctionFoldl -- base function
-  | FunctionMap -- base function
+  = FTCustom Asm.OpId String
+  | FTConstructor DataType -- function type constructor
+  | FTExtractor DataType [Int] -- function type decorator
+  | FTOperator (Ast.Op (L.Range, Type))
+  | FTIndex DataType
+  | FTFoldl -- base function
+  | FTMap -- base function
   deriving (Show)
 
 data FunctionType

@@ -6,18 +6,19 @@ import Hibiscus.CodeGen.Types
 getBulitinFunctionType :: String -> Maybe BaseFunctionType
 getBulitinFunctionType name = 
   case name of
-    "Int" -> return $ TypeConstructor int32
-    "Float" -> return $ TypeConstructor float32
-    "Bool" -> return $ TypeConstructor bool
-    "Vec2" -> return $ TypeConstructor vector2
-    "Vec3" -> return $ TypeConstructor vector3
-    "Vec4" -> return $ TypeConstructor vector4
-    "foldl" -> return $ FunctionFoldl
-    "map" -> return $ FunctionMap
-    "extract_0" -> return $ TypeExtractor float32 [0]
-    "extract_1" -> return $ TypeExtractor float32 [1]
-    "extract_2" -> return $ TypeExtractor float32 [2]
-    "extract_3" -> return $ TypeExtractor float32 [3]
+    "Int" -> return $ FTConstructor int32
+    "Float" -> return $ FTConstructor float32
+    "Bool" -> return $ FTConstructor bool
+    "Vec2" -> return $ FTConstructor vector2
+    "Vec3" -> return $ FTConstructor vector3
+    "Vec4" -> return $ FTConstructor vector4
+    "foldl" -> return $ FTFoldl
+    "map" -> return $ FTMap
+    "index_float" -> return $ FTIndex float32
+    "extract_0" -> return $ FTExtractor float32 [0]
+    "extract_1" -> return $ FTExtractor float32 [1]
+    "extract_2" -> return $ FTExtractor float32 [2]
+    "extract_3" -> return $ FTExtractor float32 [3]
     _ -> Nothing
 
 getBuiltinType :: String -> Maybe DataType
