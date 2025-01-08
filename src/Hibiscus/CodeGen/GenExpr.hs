@@ -108,6 +108,7 @@ generateTypeSt_aux1 dType = do
     DT.DTypeVector _ baseType -> fmap snd . generateTypeSt $ baseType
     DT.DTypeMatrix _ baseType -> fmap snd . generateTypeSt $ baseType
     DT.DTypeArray _ baseType -> fmap snd . generateTypeSt $ baseType
+    DT.DTypeLengthUnknownArray baseType -> fmap snd . generateTypeSt $ baseType
     DT.DTypePointer _ baseType -> fmap snd . generateTypeSt $ baseType
     DT.DTypeStruct _ fields -> foldMaplM (fmap snd . generateTypeSt) fields
     DT.DTypeFunction returnType argsType -> foldMaplM (fmap snd . generateTypeSt . DT.DTypePointer Asm.Function) (returnType : argsType)
@@ -132,6 +133,7 @@ generateTypeSt_aux2 dType typeId = state $ \state2 ->
             arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
             inst3' = inst2{typeFields = typeFields inst2 ++ arrayInst}
          in (state4, inst3')
+      DT.DTypeLengthUnknownArray baseType -> (state2, emptyInstructions)
       DT.DTypePointer storage DT.DTypeVoid -> (state2, emptyInstructions)
       DT.DTypePointer storage baseType ->
         let pointerInst = [returnedInstruction typeId (Asm.OpTypePointer storage (searchTypeId' baseType))]
@@ -333,7 +335,7 @@ generateConstSt v = do
         er <- findResultOrGenerateEntry (ResultConstant v)
         let (ExprResult (constId, dType)) = er
         let constInstruction = [returnedInstruction constId (Asm.OpConstant typeId v)]
-        let inst = typeInst{constFields = constFields typeInst ++ constInstruction}
+        let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
         return (ExprResult (constId, dtype), inst, [], [])
 
 ----- Below are use by generateExprSt (Ast.EApp _ e1 e2)
