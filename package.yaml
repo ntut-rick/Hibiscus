@@ -38,3 +38,21 @@ executable:
     - base
     - bytestring
     - hibiscus
+
+tests:
+  simple:
+    main: simple.hs
+    source-dirs:
+      - test
+    dependencies:
+      - base
+      - bytestring
+      - hibiscus
+  if-then-else:
+    main: ifelse.hs
+    source-dirs:
+      - test
+    dependencies:
+      - base
+      - bytestring
+      - hibiscus
