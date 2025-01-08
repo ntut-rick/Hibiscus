@@ -10,7 +10,7 @@ import Hibiscus.CodeGen.Type.Builtin
 -- type infer
 import Control.Monad.State.Lazy
 import qualified Data.ByteString.Lazy.Char8 as BS
-import Data.List (find, intercalate)
+import Data.List (find, intercalate, uncons)
 import qualified Data.Map as Map
 import Data.Monoid (First (..), getFirst)
 import Data.STRef (newSTRef)
@@ -20,6 +20,7 @@ import qualified Hibiscus.Ast as Ast
 import Hibiscus.CodeGen.Type.DataType (DataType)
 import qualified Hibiscus.CodeGen.Type.DataType as DT
 import Hibiscus.CodeGen.Types
+import qualified Hibiscus.CodeGen.Types as DT
 import qualified Hibiscus.TypeInfer as TI
 import Hibiscus.Util (foldMaplM, foldMaprM, replace)
 
@@ -31,12 +32,33 @@ findResult' (ResultVariable (envs, name, varType)) viIdMap =
  where
   aux :: (ResultMap, String, DataType) -> (String, DataType) -> State Env (First ExprReturn)
   aux (viIdMap, name, varType) env =
-    do
-      acc_env <- get
-      let result = Map.lookup (ResultVariable (acc_env ++ [env], name, varType)) viIdMap
+    case varType of
+      DT.DTypeLengthUnknownArray _ ->
+        do
+          acc_env <- get
+          let resultVarMap =
+                Map.toList $
+                  Map.filterWithKey
+                    ( \k _ ->
+                        case k of
+                          (DT.ResultVariableValue (_, name', _)) -> name' == name
+                          _ -> False
+                    )
+                    viIdMap
 
-      put (acc_env ++ [env])
-      return $ First result
+          let result = case resultVarMap of
+                [] -> error $ "fuck" ++ (unlines . fmap show . Map.toList) viIdMap
+                (_, result) : _ -> Just result
+
+          put (acc_env ++ [env])
+          return $ First result
+      _ ->
+        do
+          acc_env <- get
+          let result = Map.lookup (ResultVariable (acc_env ++ [env], name, varType)) viIdMap
+
+          put (acc_env ++ [env])
+          return $ First result
 findResult' (ResultVariableValue (envs, name, varType)) viIdMap =
   -- find variable up to the mother env
   let param = (viIdMap, name, varType)
