@@ -56,3 +56,11 @@ tests:
       - base
       - bytestring
       - hibiscus
+  list-array:
+    main: list.hs
+    source-dirs:
+      - test
+    dependencies:
+      - base
+      - bytestring
+      - hibiscus
