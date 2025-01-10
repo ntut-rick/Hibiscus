@@ -51,6 +51,7 @@ jobs:
           cabal-version: ${{ matrix.cabal }}
       - run: cabal v2-update
       - run: cabal v2-freeze $CONFIG
+      - run: apt install spirv-tools
       - uses: actions/cache@v2
         with:
           path: |
@@ -61,4 +62,5 @@ jobs:
             ${{ runner.os }}-${{ matrix.ghc }}-
       - run: cabal v2-test $CONFIG
       - run: cabal v2-haddock $CONFIG
-      - run: cabal v2-sdist
+      - run: cabal v2-sdi
+      - run: ./test/test.sh
