@@ -1,5 +1,7 @@
 # Hibiscus
 
+This project is a functional programming language inspired by Haskell, tailored specifically for compiling high-level functional code into SPIR-V, the intermediate representation used for GPU programming in Vulkan, OpenCL, and other platforms.
+
 ## Preparement
 
 1. Install `ghcup` and `stack` ([Ref](https://www.haskell.org/ghcup/install/))
