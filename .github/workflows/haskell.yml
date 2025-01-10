@@ -61,6 +61,4 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ matrix.ghc }}-
       - run: cabal v2-test $CONFIG
-      - run: cabal v2-haddock $CONFIG
-      - run: cabal v2-sdi
       - run: ./test/test.sh
