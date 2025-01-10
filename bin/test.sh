@@ -2,7 +2,7 @@
 
 for i in ./test/*.hi
 do
-    if ! cabal run hibiscus.cabal $i ; then
+    if ! cabal v2-run hibiscus $i ; then
         echo "error to compile $i";
         exit 1;
     fi
