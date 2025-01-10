@@ -1,3 +1,5 @@
+#!/bin/bash
+
 for i in ./test/*.hi.asm
 do
     spirv-as "$i" -o "./test/out.spv"
