@@ -6,4 +6,4 @@ import TestEverything (testEverything)
 
 
 main :: IO ()
-main = testEverything "test/test.hi"
+main = testEverything "test/exmaple.hi"
