@@ -34,9 +34,9 @@ data OpId
 
 -- TODO: Improve type safety of OpId
 type TypeId = OpId
-type PointerTypeId = OpId
 type LabelId = OpId
 type ValueId = OpId
+type FunctionId = OpId
 type PointerId = OpId
 
 instance Show OpId where
@@ -154,12 +154,12 @@ data Ops
   | OpTypeBool
   | OpTypeInt Int Int -- bit width  , 0 indicates unsigned,1 indicates signed semantics.
   | OpTypeFloat Int -- bit width
-  | OpTypeVector OpId Int -- component count
-  | OpTypeMatrix OpId Int -- vectorTypeId column count
-  | OpTypeArray OpId OpId -- data type id
-  | OpTypeStruct (ShowList OpId) -- data types id
-  | OpTypePointer StorageClass OpId
-  | OpTypeFunction OpId (ShowList OpId) -- data types id
+  | OpTypeVector TypeId Int -- component count
+  | OpTypeMatrix TypeId Int -- vectorTypeId column count
+  | OpTypeArray TypeId ValueId -- data type id
+  | OpTypeStruct (ShowList TypeId) -- data types id
+  | OpTypePointer StorageClass TypeId
+  | OpTypeFunction TypeId (ShowList TypeId) -- data types id
   | -- OpConstant
     OpConstantTrue ResultType
   | OpConstantFalse ResultType
@@ -168,86 +168,86 @@ data Ops
   | OpConstantSampler ResultType Int Int
   | OpConstantNull ResultType
   | -- OpMemory
-    OpVariable OpId StorageClass
-  | OpLoad ResultType OpId
-  | OpStore OpId OpId
+    OpVariable TypeId StorageClass
+  | OpLoad TypeId PointerId
+  | OpStore PointerId ValueId
   | -- OpFunction
-    OpFunction ResultType FunctionControl OpId
+    OpFunction ResultType FunctionControl TypeId
   | OpFunctionParameter ResultType
   | OpFunctionEnd
-  | OpFunctionCall ResultType OpId (ShowList OpId)
+  | OpFunctionCall ResultType FunctionId (ShowList PointerId)
   | -- OpConversion
-    OpConvertFToU ResultType OpId -- float to unsigned int
-  | OpConvertFToS ResultType OpId -- float to signed int
-  | OpConvertSToF ResultType OpId -- signed int to float
-  | OpConvertUToF ResultType OpId -- unsigned int to float
-  | OpUConvert ResultType OpId -- unsigned int to unsigned int
-  | OpSConvert ResultType OpId -- signed int to signed int
-  | OpFConvert ResultType OpId -- float to float
-  | OpBitcast ResultType OpId
+    OpConvertFToU ResultType ValueId -- float to unsigned int
+  | OpConvertFToS ResultType ValueId -- float to signed int
+  | OpConvertSToF ResultType ValueId -- signed int to float
+  | OpConvertUToF ResultType ValueId -- unsigned int to float
+  | OpUConvert ResultType ValueId -- unsigned int to unsigned int
+  | OpSConvert ResultType ValueId -- signed int to signed int
+  | OpFConvert ResultType ValueId -- float to float
+  | OpBitcast ResultType ValueId
   | -- OpComposite
-    OpCompositeConstruct ResultType (ShowList OpId)
-  | OpCompositeExtract ResultType OpId (ShowList Int)
-  | OpCompositeInsert ResultType OpId OpId (ShowList OpId)
+    OpCompositeConstruct ResultType (ShowList ValueId)
+  | OpCompositeExtract ResultType ValueId (ShowList Int)
+  | OpCompositeInsert ResultType ValueId ValueId (ShowList ValueId)
   | -- OpArithmetic
-    OpSNegate ResultType OpId
-  | OpFNegate ResultType OpId
-  | OpIAdd ResultType OpId OpId
-  | OpISub ResultType OpId OpId
-  | OpIMul ResultType OpId OpId
-  | OpUDiv ResultType OpId OpId -- unsigned division
-  | OpSDiv ResultType OpId OpId -- signed division
-  | OpUMod ResultType OpId OpId -- unsigned modulo
-  | OpSMod ResultType OpId OpId -- signed modulo
-  | OpFAdd ResultType OpId OpId -- float
-  | OpFSub ResultType OpId OpId
-  | OpFMul ResultType OpId OpId
-  | OpFDiv ResultType OpId OpId
-  | OpFMod ResultType OpId OpId
-  | OpFRem ResultType OpId OpId
-  | OpVectorTimesScalar ResultType OpId OpId
-  | OpVectorTimesMatrix ResultType OpId OpId
-  | OpMatrixTimesScalar ResultType OpId OpId
-  | OpMatrixTimesVector ResultType OpId OpId
-  | OpMatrixTimesMatrix ResultType OpId OpId
+    OpSNegate ResultType ValueId
+  | OpFNegate ResultType ValueId
+  | OpIAdd ResultType ValueId ValueId
+  | OpISub ResultType ValueId ValueId
+  | OpIMul ResultType ValueId ValueId
+  | OpUDiv ResultType ValueId ValueId -- unsigned division
+  | OpSDiv ResultType ValueId ValueId -- signed division
+  | OpUMod ResultType ValueId ValueId -- unsigned modulo
+  | OpSMod ResultType ValueId ValueId -- signed modulo
+  | OpFAdd ResultType ValueId ValueId -- float
+  | OpFSub ResultType ValueId ValueId
+  | OpFMul ResultType ValueId ValueId
+  | OpFDiv ResultType ValueId ValueId
+  | OpFMod ResultType ValueId ValueId
+  | OpFRem ResultType ValueId ValueId
+  | OpVectorTimesScalar ResultType ValueId ValueId
+  | OpVectorTimesMatrix ResultType ValueId ValueId
+  | OpMatrixTimesScalar ResultType ValueId ValueId
+  | OpMatrixTimesVector ResultType ValueId ValueId
+  | OpMatrixTimesMatrix ResultType ValueId ValueId
   | -- OpLogical
-    OpLogicalEqual ResultType OpId OpId
-  | OpLogicalNotEqual ResultType OpId OpId
-  | OpLogicalOr ResultType OpId OpId
-  | OpLogicalAnd ResultType OpId OpId
-  | OpLogicalNot ResultType OpId
-  | OpLogicalXor ResultType OpId OpId
-  | OpIEqual ResultType OpId OpId -- int
-  | OpINotEqual ResultType OpId OpId
-  | OpUGreaterThan ResultType OpId OpId
-  | OpSGreaterThan ResultType OpId OpId
-  | OpUGreaterThanEqual ResultType OpId OpId
-  | OpSGreaterThanEqual ResultType OpId OpId
-  | OpULessThan ResultType OpId OpId
-  | OpSLessThan ResultType OpId OpId
-  | OpULessThanEqual ResultType OpId OpId
-  | OpSLessThanEqual ResultType OpId OpId
-  | OpFOrdEqual ResultType OpId OpId -- float
-  | OpFUnordEqual ResultType OpId OpId
-  | OpFOrdNotEqual ResultType OpId OpId
-  | OpFUnordNotEqual ResultType OpId OpId
-  | OpFOrdLessThan ResultType OpId OpId
-  | OpFUnordLessThan ResultType OpId OpId
-  | OpFOrdGreaterThan ResultType OpId OpId
-  | OpFUnordGreaterThan ResultType OpId OpId
-  | OpFOrdLessThanEqual ResultType OpId OpId
-  | OpFUnordLessThanEqual ResultType OpId OpId
-  | OpFOrdGreaterThanEqual ResultType OpId OpId
-  | OpFUnordGreaterThanEqual ResultType OpId OpId
+    OpLogicalEqual ResultType ValueId ValueId
+  | OpLogicalNotEqual ResultType ValueId ValueId
+  | OpLogicalOr ResultType ValueId ValueId
+  | OpLogicalAnd ResultType ValueId ValueId
+  | OpLogicalNot ResultType ValueId
+  | OpLogicalXor ResultType ValueId ValueId
+  | OpIEqual ResultType ValueId ValueId -- int
+  | OpINotEqual ResultType ValueId ValueId
+  | OpUGreaterThan ResultType ValueId ValueId
+  | OpSGreaterThan ResultType ValueId ValueId
+  | OpUGreaterThanEqual ResultType ValueId ValueId
+  | OpSGreaterThanEqual ResultType ValueId ValueId
+  | OpULessThan ResultType ValueId ValueId
+  | OpSLessThan ResultType ValueId ValueId
+  | OpULessThanEqual ResultType ValueId ValueId
+  | OpSLessThanEqual ResultType ValueId ValueId
+  | OpFOrdEqual ResultType ValueId ValueId -- float
+  | OpFUnordEqual ResultType ValueId ValueId
+  | OpFOrdNotEqual ResultType ValueId ValueId
+  | OpFUnordNotEqual ResultType ValueId ValueId
+  | OpFOrdLessThan ResultType ValueId ValueId
+  | OpFUnordLessThan ResultType ValueId ValueId
+  | OpFOrdGreaterThan ResultType ValueId ValueId
+  | OpFUnordGreaterThan ResultType ValueId ValueId
+  | OpFOrdLessThanEqual ResultType ValueId ValueId
+  | OpFUnordLessThanEqual ResultType ValueId ValueId
+  | OpFOrdGreaterThanEqual ResultType ValueId ValueId
+  | OpFUnordGreaterThanEqual ResultType ValueId ValueId
   | -- OpControlFlow
     OpLabel
-  | OpBranch OpId
-  | OpBranchConditional OpId OpId OpId
-  | OpSelectionMerge OpId FunctionControl
+  | OpBranch LabelId
+  | OpBranchConditional ValueId LabelId LabelId
+  | OpSelectionMerge LabelId FunctionControl
   | OpSwitch OpId OpId [(Int, OpId)]
   | OpKill
   | OpReturn
-  | OpReturnValue OpId
+  | OpReturnValue ValueId
   | OpUnreachable
   | Comment String
   deriving (Show)
