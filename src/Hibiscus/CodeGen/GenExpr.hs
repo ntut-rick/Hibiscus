@@ -129,7 +129,7 @@ generateTypeSt_aux2 dType typeId = state $ \state2 ->
       DT.DTypeVector size baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]})
       DT.DTypeMatrix col baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]})
       DT.DTypeArray size baseType ->
-        let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀 
+        let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀
             arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
             inst3' = inst2{typeFields = typeFields inst2 ++ arrayInst}
          in (state4, inst3')
@@ -523,8 +523,9 @@ generateExprSt (Ast.EList (_, t) es) =
               arrayId
               (Asm.OpConstantComposite typeId (Asm.ShowList varIds))
           )
-    let inst = globalInst +++ typeInst
-    return (ExprResult (arrayId, dt), inst, [], [arrayInst])
+    let typeInst' = typeInst{typeFields = typeFields typeInst ++ [arrayInst]}
+    let inst = globalInst +++ typeInst'
+    return (ExprResult (arrayId, dt), inst, [], [])
 generateExprSt (Ast.EVar (_, t1) (Ast.Name _ bsname)) =
   let
     name = BS.unpack bsname
