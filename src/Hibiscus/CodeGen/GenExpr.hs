@@ -114,47 +114,42 @@ generateTypeSt_aux1 dType = do
     DT.DTypeFunction returnType argsType -> foldMaplM (fmap snd . generateTypeSt . DT.DTypePointer Asm.Function) (returnType : argsType)
 
 generateTypeSt_aux2 :: DataType -> Asm.ResultId -> State LanxSt Instructions
-generateTypeSt_aux2 dType typeId = state $ \state2 ->
-  let
-    searchTypeId' = searchTypeId state2
+generateTypeSt_aux2 dType typeId = do
+  state2 <- get
 
-    -- IDK how this is possible, so I'll leave this magic in the box.
-    (state3, inst3) = case dType of
-      DT.DTypeUnknown -> error "Unknown type"
-      DT.DTypeVoid -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeVoid]})
-      DT.DTypeBool -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeBool]})
-      DT.DTypeInt size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 0)]})
-      DT.DTypeUInt size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 1)]})
-      DT.DTypeFloat size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeFloat size)]})
-      DT.DTypeVector size baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]})
-      DT.DTypeMatrix col baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]})
-      DT.DTypeArray size baseType ->
-        let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀
-            arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
-            inst3' = inst2{typeFields = typeFields inst2 ++ arrayInst}
-         in (state4, inst3')
-      DT.DTypeLengthUnknownArray baseType -> (state2, emptyInstructions)
-      DT.DTypePointer storage DT.DTypeVoid -> (state2, emptyInstructions)
-      DT.DTypePointer storage baseType ->
-        let pointerInst = [returnedInstruction typeId (Asm.OpTypePointer storage (searchTypeId' baseType))]
-            inst2' = emptyInstructions{typeFields = pointerInst}
-         in (state2, inst2')
-      DT.DTypeStruct name baseTypes ->
-        let structInst = [returnedInstruction typeId (Asm.OpTypeStruct (Asm.ShowList (map searchTypeId' baseTypes)))]
-            inst2' = emptyInstructions{typeFields = structInst}
-         in (state2, inst2')
-      DT.DTypeFunction returnType argTypes ->
-        let functionInst = [returnedInstruction typeId (Asm.OpTypeFunction (searchTypeId' returnType) (Asm.ShowList (map (searchTypeId' . DT.DTypePointer Asm.Function) argTypes)))]
-            inst2' = emptyInstructions{typeFields = functionInst}
-         in (state2, inst2')
+  let searchTypeId' = searchTypeId state2
 
-    updatedState =
-      state3
-        { idCount = idCount state3
-        , idMap = idMap state3
-        }
-   in
-    (inst3, updatedState)
+  -- IDK how this is possible, so I'll leave this magic in the box.
+  case dType of
+    DT.DTypeUnknown -> error "Unknown type"
+    DT.DTypeVoid -> return emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeVoid]}
+    DT.DTypeBool -> return emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeBool]}
+    DT.DTypeInt size -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 0)]}
+    DT.DTypeUInt size -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 1)]}
+    DT.DTypeFloat size -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeFloat size)]}
+    DT.DTypeVector size baseType -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]}
+    DT.DTypeMatrix col baseType -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]}
+    DT.DTypeArray size baseType -> do
+      -- FIXME: idk how to remove runState here
+      let ((ExprResult (constId, _), inst2, _, _), state3) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀
+      let arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
+      let inst3 = inst2{typeFields = typeFields inst2 ++ arrayInst}
+      put (state3{idCount = idCount state3, idMap = idMap state3})
+      return inst3
+    DT.DTypeLengthUnknownArray baseType -> return emptyInstructions
+    DT.DTypePointer storage DT.DTypeVoid -> return emptyInstructions
+    DT.DTypePointer storage baseType ->
+      let pointerInst = [returnedInstruction typeId (Asm.OpTypePointer storage (searchTypeId' baseType))]
+          inst2' = emptyInstructions{typeFields = pointerInst}
+       in return inst2'
+    DT.DTypeStruct name baseTypes ->
+      let structInst = [returnedInstruction typeId (Asm.OpTypeStruct (Asm.ShowList (map searchTypeId' baseTypes)))]
+          inst2' = emptyInstructions{typeFields = structInst}
+       in return inst2'
+    DT.DTypeFunction returnType argTypes ->
+      let functionInst = [returnedInstruction typeId (Asm.OpTypeFunction (searchTypeId' returnType) (Asm.ShowList (map (searchTypeId' . DT.DTypePointer Asm.Function) argTypes)))]
+          inst2' = emptyInstructions{typeFields = functionInst}
+       in return inst2'
 
 -- used by a lot of place
 generateTypeSt :: DataType -> State LanxSt (Asm.OpId, Instructions)
@@ -329,20 +324,20 @@ generateConstSt v = do
   case findResult state (ResultConstant v) of
     Just x -> return (x, mempty, [], [])
     Nothing ->
-        do
-          let dtype = dtypeof v
-          (typeId, typeInst) <- generateTypeSt dtype
-          er <- findResultOrGenerateEntry (ResultConstant v)
-          let (ExprResult (constId, dType)) = er
-          let constInstruction = case v of
-                Asm.LInt _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LUint _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LFloat _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LBool t_f | t_f==True -> [returnedInstruction constId (Asm.OpConstantTrue typeId)]
-                Asm.LBool t_f | t_f==False-> [returnedInstruction constId (Asm.OpConstantFalse typeId)]
-                _ -> error ("Not supported"++ show v)
-          let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
-          return (ExprResult (constId, dtype), inst, [], [])
+      do
+        let dtype = dtypeof v
+        (typeId, typeInst) <- generateTypeSt dtype
+        er <- findResultOrGenerateEntry (ResultConstant v)
+        let (ExprResult (constId, dType)) = er
+        let constInstruction = case v of
+              Asm.LInt _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+              Asm.LUint _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+              Asm.LFloat _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+              Asm.LBool t_f | t_f == True -> [returnedInstruction constId (Asm.OpConstantTrue typeId)]
+              Asm.LBool t_f | t_f == False -> [returnedInstruction constId (Asm.OpConstantFalse typeId)]
+              _ -> error ("Not supported" ++ show v)
+        let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
+        return (ExprResult (constId, dtype), inst, [], [])
 
 ----- Below are use by generateExprSt (Ast.EApp _ e1 e2)
 
