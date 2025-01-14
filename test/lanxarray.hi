@@ -1,0 +1,30 @@
+Vec4 :: Float -> Float -> Float -> Float -> Vec4 
+Vec2 :: Float -> Float -> Vec2
+extract_0 :: Vec2 ->  Float
+extract_1 :: Vec2 ->  Float
+index_int :: [Int] -> Int -> Int
+index_float :: [Float] -> Int -> Float
+map_f2f :: (Float -> Float) -> [Float] -> [Float]
+
+add :: Float -> Float -> Float
+add a b = a + b;
+
+sub :: Float -> Float -> Float
+sub a b = a - b;
+
+f :: [Float]
+f = [0.0,0.5,1.0];
+
+main :: Vec2 -> Vec4
+main uv = 
+    let  
+        x = extract_0 uv;
+        y = extract_1 uv;
+        half = index_float f 1;
+        blue = half;
+        -- blue = if (x<half) then
+        --     index_float f 0
+        -- else
+        --     index_float f 2;
+    in 
+        Vec4 x y blue 1.0;
