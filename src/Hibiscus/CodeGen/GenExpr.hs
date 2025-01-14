@@ -329,14 +329,20 @@ generateConstSt v = do
   case findResult state (ResultConstant v) of
     Just x -> return (x, mempty, [], [])
     Nothing ->
-      do
-        let dtype = dtypeof v
-        (typeId, typeInst) <- generateTypeSt dtype
-        er <- findResultOrGenerateEntry (ResultConstant v)
-        let (ExprResult (constId, dType)) = er
-        let constInstruction = [returnedInstruction constId (Asm.OpConstant typeId v)]
-        let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
-        return (ExprResult (constId, dtype), inst, [], [])
+        do
+          let dtype = dtypeof v
+          (typeId, typeInst) <- generateTypeSt dtype
+          er <- findResultOrGenerateEntry (ResultConstant v)
+          let (ExprResult (constId, dType)) = er
+          let constInstruction = case v of
+                Asm.LInt _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+                Asm.LUint _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+                Asm.LFloat _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
+                Asm.LBool t_f | t_f==True -> [returnedInstruction constId (Asm.OpConstantTrue typeId)]
+                Asm.LBool t_f | t_f==False-> [returnedInstruction constId (Asm.OpConstantFalse typeId)]
+                _ -> error ("Not supported"++ show v)
+          let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
+          return (ExprResult (constId, dtype), inst, [], [])
 
 ----- Below are use by generateExprSt (Ast.EApp _ e1 e2)
 
@@ -539,7 +545,11 @@ generateExprSt (Ast.EVar (_, t1) (Ast.Name _ bsname)) =
         Nothing ->
           case findDec (decs state) name dType of
             Just dec -> do
+              old_env <- gets env
+              -- set global env
+              modify (\s -> s{env = [global]})
               result <- generateDecSt dec
+              modify (\s -> s{env = old_env})
               return result
             Nothing -> case getBulitinFunctionType name of
               Just funcTy -> do

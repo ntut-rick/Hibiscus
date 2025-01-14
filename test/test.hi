@@ -11,8 +11,7 @@ sub :: Float -> Float -> Float
 sub a b = add a (-b);
 
 main :: Vec2 -> Vec4
-main uv = 
-    let 
+main uv = let 
         -- d = (+) 0.5;
         -- d = add 0.4 0.5;
 
@@ -23,14 +22,14 @@ main uv =
             if (x > 0.5) then
                 add
             else
-                (+)
+                add
         else
             sub;
         t = if (x > 0.5) then
             0.5
         else
-            0.4
+            0.4;
         d1 = d t;
         d2 = d1 y;
     in
-        Vec4 x y d3 1.0;
+        Vec4 x y d2 1.0;
