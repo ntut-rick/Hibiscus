@@ -27,6 +27,7 @@ library:
     - containers
     - mtl
     - transformers
+    - template-haskell
   build-tools:
     - alex
     - happy
