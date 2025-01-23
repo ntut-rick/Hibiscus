@@ -41,7 +41,7 @@ findResult' (ResultVariable (envs, name, varType)) viIdMap =
                   Map.filterWithKey
                     ( \k _ ->
                         case k of
-                          (DT.ResultVariableValue (_, name', _)) -> name' == name
+                          (DT.ResultVariable (_, name', _)) -> name' == name
                           _ -> False
                     )
                     viIdMap

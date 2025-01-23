@@ -15,6 +15,7 @@ import qualified Data.Map as Map
 import Data.Maybe
 import Data.Monoid (First (..), getFirst)
 import Data.STRef (newSTRef)
+import Data.Type.Bool (If)
 import qualified Hibiscus.Asm as Asm
 import qualified Hibiscus.Ast as Ast
 import Hibiscus.CodeGen.Type.DataType (DataType)
@@ -22,8 +23,6 @@ import qualified Hibiscus.CodeGen.Type.DataType as DT
 import qualified Hibiscus.Parsing.Lexer as L
 import qualified Hibiscus.TypeInfer as TI
 import Hibiscus.Util (foldMaplM, foldMaprM, replace)
-import Data.Type.Bool (If)
-
 
 ----- Instruction constructor helpers BEGIN -----
 
@@ -62,7 +61,6 @@ type ResultMap = Map.Map ResultType ExprReturn
 type VariableInst = [Asm.Instruction]
 type StackInst = [Asm.Instruction]
 
-
 data Config = Config
   { capability :: Asm.Capability
   , extension :: String
@@ -87,7 +85,7 @@ data BaseFunctionType
 
 data FunctionType
   = BaseFunction BaseFunctionType
-  | IfElseApplication Expr Expr Expr  -- if, then, else
+  | IfElseApplication Expr Expr Expr -- if, then, else
   deriving (Show)
 
 data ExprReturn
@@ -164,6 +162,17 @@ data FunctionInst = FunctionInst
   , end :: [Asm.Instruction]
   }
   deriving (Show)
+
+emptyFunctionInst :: FunctionInst
+emptyFunctionInst =
+  FunctionInst
+    { begin = []
+    , parameter = []
+    , label = []
+    , variable = []
+    , body = []
+    , end = []
+    }
 
 data Instructions = Instructions
   { headerFields :: HeaderFields -- HACK: Maybe

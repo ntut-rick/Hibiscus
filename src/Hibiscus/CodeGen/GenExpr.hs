@@ -115,9 +115,7 @@ generateTypeSt_aux1 dType = do
 
 generateTypeSt_aux2 :: DataType -> Asm.ResultId -> State LanxSt Instructions
 generateTypeSt_aux2 dType typeId = do
-  state2 <- get
-
-  let searchTypeId' = searchTypeId state2
+  searchTypeId' <- gets (\s -> searchTypeId s)
 
   -- IDK how this is possible, so I'll leave this magic in the box.
   case dType of
@@ -130,11 +128,11 @@ generateTypeSt_aux2 dType typeId = do
     DT.DTypeVector size baseType -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]}
     DT.DTypeMatrix col baseType -> return emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]}
     DT.DTypeArray size baseType -> do
-      -- FIXME: idk how to remove runState here
-      let ((ExprResult (constId, _), inst2, _, _), state3) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀
+      er' <- generateConstSt (Asm.LUint size) -- 💀
+      let (ExprResult (constId, _), inst2, _, _) = er'
       let arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
       let inst3 = inst2{typeFields = typeFields inst2 ++ arrayInst}
-      put (state3{idCount = idCount state3, idMap = idMap state3})
+      modify (\s -> s{idCount = idCount s, idMap = idMap s})
       return inst3
     DT.DTypeLengthUnknownArray baseType -> return emptyInstructions
     DT.DTypePointer storage DT.DTypeVoid -> return emptyInstructions
@@ -383,12 +381,26 @@ handleExtractSt returnType i var@(opId, _) =
     return (ExprResult (returnId, returnType), inst, [], stackInst)
 
 handleIndexSt :: DataType -> Variable -> Variable -> State LanxSt VeryImportantTuple
-handleIndexSt returnType (baseId, _) (indexId, _) =
+handleIndexSt returnType (baseId, baseType) (indexId, _) =
   do
-    (typeId, inst) <- generateTypeSt returnType
-    returnId <- nextOpId
-    let stackInst = [returnedInstruction returnId (Asm.OpAccessChain typeId baseId (Asm.ShowList [indexId]))]
-    return (ExprResult (returnId, returnType), inst, [], stackInst)
+    (returnTypeId, returnTypeInst) <- generateTypeSt returnType
+    (returnPtrTypeId, returnPtrTypeInst) <- generateTypeSt (DT.DTypePointer Asm.Function returnType)
+    (arrayPtrTypeId, arrayPtrTypeInst) <- generateTypeSt (DT.DTypePointer Asm.Function baseType)
+    (arrayId, arrayRefInst) <- generateArrayRef arrayPtrTypeId
+
+    accessId <- nextOpId
+    let accessInst = returnedInstruction accessId (Asm.OpAccessChain returnPtrTypeId arrayId (Asm.ShowList [indexId]))
+    loadId <- nextOpId
+    let loadInst = returnedInstruction loadId (Asm.OpLoad returnTypeId accessId)
+    let stackInst = arrayRefInst ++ [accessInst, loadInst]
+    return (ExprResult (loadId, returnType), returnTypeInst +++ returnPtrTypeInst +++ arrayPtrTypeInst, [], stackInst)
+ where
+  generateArrayRef :: Asm.OpId -> State LanxSt (Asm.OpId, [Asm.Instruction])
+  generateArrayRef arrayTypeId = do
+    arrayId <- nextOpId
+    let arrayVarInst = returnedInstruction arrayId (Asm.OpVariable arrayTypeId Asm.Function)
+    let storeInst = noReturnInstruction (Asm.OpStore arrayId baseId)
+    return (arrayId, [arrayVarInst, storeInst])
 
 ----- Below are stateless
 
@@ -513,7 +525,7 @@ generateExprSt (Ast.EList (_, t) es) =
     let makeAssociative (a, b, c, d) = ([a], b, c, d)
     (results, globalInst, var, stackInst) <- foldMaplM (fmap makeAssociative . generateExprSt) es
     let dt = typeConvert t
-    (typeId, typeInst) <- generateTypeSt (DT.DTypeArray len dt)
+    (typeId, typeInst) <- generateTypeSt dt
 
     let varIds = map (\(ExprResult (id, _)) -> id) results
 
