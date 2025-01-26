@@ -386,21 +386,26 @@ handleIndexSt returnType (baseId, baseType) (indexId, _) =
     (returnTypeId, returnTypeInst) <- generateTypeSt returnType
     (returnPtrTypeId, returnPtrTypeInst) <- generateTypeSt (DT.DTypePointer Asm.Function returnType)
     (arrayPtrTypeId, arrayPtrTypeInst) <- generateTypeSt (DT.DTypePointer Asm.Function baseType)
-    (arrayId, arrayRefInst) <- generateArrayRef arrayPtrTypeId
+    (arrayId, arrayVarInst, arrayRefInst) <- generateArrayRef arrayPtrTypeId
 
     accessId <- nextOpId
     let accessInst = returnedInstruction accessId (Asm.OpAccessChain returnPtrTypeId arrayId (Asm.ShowList [indexId]))
     loadId <- nextOpId
     let loadInst = returnedInstruction loadId (Asm.OpLoad returnTypeId accessId)
     let stackInst = arrayRefInst ++ [accessInst, loadInst]
-    return (ExprResult (loadId, returnType), returnTypeInst +++ returnPtrTypeInst +++ arrayPtrTypeInst, [], stackInst)
+    return
+      ( ExprResult (loadId, returnType)
+      , returnTypeInst +++ returnPtrTypeInst +++ arrayPtrTypeInst
+      , arrayVarInst
+      , stackInst
+      )
  where
-  generateArrayRef :: Asm.OpId -> State LanxSt (Asm.OpId, [Asm.Instruction])
+  generateArrayRef :: Asm.OpId -> State LanxSt (Asm.OpId, VariableInst, StackInst)
   generateArrayRef arrayTypeId = do
     arrayId <- nextOpId
     let arrayVarInst = returnedInstruction arrayId (Asm.OpVariable arrayTypeId Asm.Function)
     let storeInst = noReturnInstruction (Asm.OpStore arrayId baseId)
-    return (arrayId, [arrayVarInst, storeInst])
+    return (arrayId, [arrayVarInst], [storeInst])
 
 ----- Below are stateless
 
