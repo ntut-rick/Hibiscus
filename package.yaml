@@ -19,6 +19,7 @@ library:
     - Hibiscus.CodeGen.Types
     - Hibiscus.CodeGen
     - Hibiscus.Asm
+    - Hibiscus.Asm2
     - Hibiscus.TypeInfer
   dependencies:
     - array
@@ -41,10 +42,10 @@ executable:
     - hibiscus
 
 tests:
-  if-then-else:
-    main: ifelse.hs
+  th:
+    main: test.hs
     source-dirs:
-      - test
+      - test-th
     dependencies:
       - base
       - bytestring
