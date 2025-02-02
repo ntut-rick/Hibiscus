@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds -fno-warn-missing-signatures #-}
 
@@ -18,6 +19,7 @@ import Data.STRef (newSTRef)
 import qualified Hibiscus.Asm as Asm
 import qualified Hibiscus.Ast as Ast
 import Hibiscus.CodeGen.Type.DataType (DataType)
+import Hibiscus.CodeGen.Emit (Emit, emit)
 import qualified Hibiscus.CodeGen.Type.DataType as DT
 import qualified Hibiscus.Parsing.Lexer as L
 import qualified Hibiscus.TypeInfer as TI
@@ -27,14 +29,14 @@ import Data.Type.Bool (If)
 
 ----- Instruction constructor helpers BEGIN -----
 
-noReturnInstruction :: Asm.Ops -> Asm.Instruction
-noReturnInstruction op = Asm.Instruction (Nothing, op)
+noReturnInstruction :: Asm.Op -> Asm.Instruction
+noReturnInstruction op = Asm.Inst op Nothing
 
-returnedInstruction :: Asm.ResultId -> Asm.Ops -> Asm.Instruction
-returnedInstruction id op = Asm.Instruction (Just id, op)
+-- returnedInstruction :: Asm.ResultId -> Asm.Ops -> Asm.Instruction
+-- returnedInstruction id op = Asm.Instruction (Just id, op)
 
 commentInstruction :: String -> Asm.Instruction
-commentInstruction = noReturnInstruction . Asm.Comment
+commentInstruction = Asm.Comment
 
 ----- Instruction constructor helpers END -------
 

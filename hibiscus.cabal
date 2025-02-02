@@ -23,7 +23,6 @@ library
       Hibiscus.CodeGen.Types
       Hibiscus.CodeGen
       Hibiscus.Asm
-      Hibiscus.Asm2
       Hibiscus.TypeInfer
   other-modules:
       Hibiscus.CodeGen.Emit

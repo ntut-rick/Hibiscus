@@ -121,29 +121,29 @@ generateTypeSt_aux2 dType typeId = state $ \state2 ->
     -- IDK how this is possible, so I'll leave this magic in the box.
     (state3, inst3) = case dType of
       DT.DTypeUnknown -> error "Unknown type"
-      DT.DTypeVoid -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeVoid]})
-      DT.DTypeBool -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId Asm.OpTypeBool]})
-      DT.DTypeInt size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 0)]})
-      DT.DTypeUInt size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeInt size 1)]})
-      DT.DTypeFloat size -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeFloat size)]})
-      DT.DTypeVector size baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeVector (searchTypeId' baseType) size)]})
-      DT.DTypeMatrix col baseType -> (state2, emptyInstructions{typeFields = [returnedInstruction typeId (Asm.OpTypeMatrix (searchTypeId' baseType) col)]})
+      DT.DTypeVoid -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeVoid typeId) Nothing]})
+      DT.DTypeBool -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeBool typeId) Nothing]})
+      DT.DTypeInt size -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeInt typeId size 0) Nothing]})
+      DT.DTypeUInt size -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeInt typeId size 1) Nothing]})
+      DT.DTypeFloat size -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeFloat typeId size) Nothing]})
+      DT.DTypeVector size baseType -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeVector typeId (searchTypeId' baseType) size) Nothing]})
+      DT.DTypeMatrix col baseType -> (state2, emptyInstructions{typeFields = [Asm.Inst (Asm.OpTypeMatrix typeId (searchTypeId' baseType) col) Nothing]})
       DT.DTypeArray size baseType ->
         let ((ExprResult (constId, _), inst2, _, _), state4) = runState (generateConstSt (Asm.LUint size)) state2 -- 💀 
-            arrayInst = [returnedInstruction typeId (Asm.OpTypeArray (searchTypeId' baseType) constId)]
+            arrayInst = [Asm.Inst (Asm.OpTypeArray typeId (searchTypeId' baseType) constId) Nothing]
             inst3' = inst2{typeFields = typeFields inst2 ++ arrayInst}
          in (state4, inst3')
       DT.DTypePointer storage DT.DTypeVoid -> (state2, emptyInstructions)
       DT.DTypePointer storage baseType ->
-        let pointerInst = [returnedInstruction typeId (Asm.OpTypePointer storage (searchTypeId' baseType))]
+        let pointerInst = [Asm.Inst (Asm.OpTypePointer typeId storage (searchTypeId' baseType)) Nothing]
             inst2' = emptyInstructions{typeFields = pointerInst}
          in (state2, inst2')
       DT.DTypeStruct name baseTypes ->
-        let structInst = [returnedInstruction typeId (Asm.OpTypeStruct (Asm.ShowList (map searchTypeId' baseTypes)))]
+        let structInst = [Asm.Inst (Asm.OpTypeStruct typeId (map searchTypeId' baseTypes)) Nothing]
             inst2' = emptyInstructions{typeFields = structInst}
          in (state2, inst2')
       DT.DTypeFunction returnType argTypes ->
-        let functionInst = [returnedInstruction typeId (Asm.OpTypeFunction (searchTypeId' returnType) (Asm.ShowList (map (searchTypeId' . DT.DTypePointer Asm.Function) argTypes)))]
+        let functionInst = [Asm.Inst (Asm.OpTypeFunction typeId (searchTypeId' returnType) (map (searchTypeId' . DT.DTypePointer Asm.Function) argTypes)) Nothing]
             inst2' = emptyInstructions{typeFields = functionInst}
          in (state2, inst2')
 
@@ -179,11 +179,11 @@ generateNegOpSt v@(e, t) =
     let asmop =
           case t of
             t
-              | t == DT.bool -> Asm.OpLogicalNot typeId e
-              | t == DT.int32 -> Asm.OpSNegate typeId e
-              | t == DT.float32 -> Asm.OpFNegate typeId e
+              | t == DT.bool -> Asm.OpLogicalNot id typeId e
+              | t == DT.int32 -> Asm.OpSNegate id typeId e
+              | t == DT.float32 -> Asm.OpFNegate id typeId e
             _ -> error ("not support neg of " ++ show t)
-    let inst = returnedInstruction id asmop
+    let inst = Asm.Inst asmop Nothing
     let result = (id, t)
     return (result, [inst])
 
@@ -200,47 +200,47 @@ generateBinOpSt v1@(e1, t1) op v2@(e2, t2) =
             (t1, t2)
               | t1 == DT.bool && t2 == DT.bool ->
                   case op of
-                    Ast.Eq _ -> (DT.bool, returnedInstruction id (Asm.OpLogicalEqual boolId e1 e2))
-                    Ast.Neq _ -> (DT.bool, returnedInstruction id (Asm.OpLogicalNotEqual boolId e1 e2))
-                    Ast.And _ -> (DT.bool, returnedInstruction id (Asm.OpLogicalAnd boolId e1 e2))
-                    Ast.Or _ -> (DT.bool, returnedInstruction id (Asm.OpLogicalOr boolId e1 e2))
+                    Ast.Eq _ -> (DT.bool, Asm.Inst (Asm.OpLogicalEqual id boolId e1 e2) Nothing)
+                    Ast.Neq _ -> (DT.bool, Asm.Inst (Asm.OpLogicalNotEqual id boolId e1 e2) Nothing)
+                    Ast.And _ -> (DT.bool, Asm.Inst (Asm.OpLogicalAnd id boolId e1 e2) Nothing)
+                    Ast.Or _ -> (DT.bool, Asm.Inst (Asm.OpLogicalOr id boolId e1 e2) Nothing)
               | t1 == DT.int32 && t2 == DT.int32 ->
                   case op of
-                    Ast.Plus _ -> (DT.int32, returnedInstruction id (Asm.OpIAdd typeId1 e1 e2))
-                    Ast.Minus _ -> (DT.int32, returnedInstruction id (Asm.OpISub typeId1 e1 e2))
-                    Ast.Times _ -> (DT.int32, returnedInstruction id (Asm.OpIMul typeId1 e1 e2))
-                    Ast.Divide _ -> (DT.int32, returnedInstruction id (Asm.OpSDiv typeId1 e1 e2))
-                    Ast.Eq _ -> (DT.bool, returnedInstruction id (Asm.OpIEqual boolId e1 e2))
-                    Ast.Neq _ -> (DT.bool, returnedInstruction id (Asm.OpINotEqual boolId e1 e2))
-                    Ast.Lt _ -> (DT.bool, returnedInstruction id (Asm.OpSLessThan boolId e1 e2))
-                    Ast.Le _ -> (DT.bool, returnedInstruction id (Asm.OpSLessThanEqual boolId e1 e2))
-                    Ast.Gt _ -> (DT.bool, returnedInstruction id (Asm.OpSGreaterThan boolId e1 e2))
-                    Ast.Ge _ -> (DT.bool, returnedInstruction id (Asm.OpSGreaterThanEqual boolId e1 e2))
+                    Ast.Plus _ -> (DT.int32, Asm.Inst (Asm.OpIAdd id typeId1 e1 e2) Nothing)
+                    Ast.Minus _ -> (DT.int32, Asm.Inst (Asm.OpISub id typeId1 e1 e2) Nothing)
+                    Ast.Times _ -> (DT.int32, Asm.Inst (Asm.OpIMul id typeId1 e1 e2) Nothing)
+                    Ast.Divide _ -> (DT.int32, Asm.Inst (Asm.OpSDiv id typeId1 e1 e2) Nothing)
+                    Ast.Eq _ -> (DT.bool, Asm.Inst (Asm.OpIEqual id boolId e1 e2) Nothing)
+                    Ast.Neq _ -> (DT.bool, Asm.Inst (Asm.OpINotEqual id boolId e1 e2) Nothing)
+                    Ast.Lt _ -> (DT.bool, Asm.Inst (Asm.OpSLessThan id boolId e1 e2) Nothing)
+                    Ast.Le _ -> (DT.bool, Asm.Inst (Asm.OpSLessThanEqual id boolId e1 e2) Nothing)
+                    Ast.Gt _ -> (DT.bool, Asm.Inst (Asm.OpSGreaterThan id boolId e1 e2) Nothing)
+                    Ast.Ge _ -> (DT.bool, Asm.Inst (Asm.OpSGreaterThanEqual id boolId e1 e2) Nothing)
               | t1 == DT.int32 && t2 == DT.float32 -> error "Not implemented"
               | t1 == DT.float32 && t2 == DT.int32 -> error "Not implemented"
               | t1 == DT.float32 && t2 == DT.float32 ->
                   case op of
-                    Ast.Plus _ -> (DT.float32, returnedInstruction id (Asm.OpFAdd typeId1 e1 e2))
-                    Ast.Minus _ -> (DT.float32, returnedInstruction id (Asm.OpFSub typeId1 e1 e2))
-                    Ast.Times _ -> (DT.float32, returnedInstruction id (Asm.OpFMul typeId1 e1 e2))
-                    Ast.Divide _ -> (DT.float32, returnedInstruction id (Asm.OpFDiv typeId1 e1 e2))
-                    Ast.Eq _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdEqual boolId e1 e2))
-                    Ast.Neq _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdNotEqual boolId e1 e2))
-                    Ast.Lt _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdLessThan boolId e1 e2))
-                    Ast.Le _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdLessThanEqual boolId e1 e2))
-                    Ast.Gt _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdGreaterThan boolId e1 e2))
-                    Ast.Ge _ -> (DT.bool, returnedInstruction id (Asm.OpFOrdGreaterThanEqual boolId e1 e2))
+                    Ast.Plus _ -> (DT.float32, Asm.Inst (Asm.OpFAdd id typeId1 e1 e2) Nothing)
+                    Ast.Minus _ -> (DT.float32, Asm.Inst (Asm.OpFSub id typeId1 e1 e2) Nothing)
+                    Ast.Times _ -> (DT.float32, Asm.Inst (Asm.OpFMul id typeId1 e1 e2) Nothing)
+                    Ast.Divide _ -> (DT.float32, Asm.Inst (Asm.OpFDiv id typeId1 e1 e2) Nothing)
+                    Ast.Eq _ -> (DT.bool, Asm.Inst (Asm.OpFOrdEqual id boolId e1 e2) Nothing)
+                    Ast.Neq _ -> (DT.bool, Asm.Inst (Asm.OpFOrdNotEqual id boolId e1 e2) Nothing)
+                    Ast.Lt _ -> (DT.bool, Asm.Inst (Asm.OpFOrdLessThan id boolId e1 e2) Nothing)
+                    Ast.Le _ -> (DT.bool, Asm.Inst (Asm.OpFOrdLessThanEqual id boolId e1 e2) Nothing)
+                    Ast.Gt _ -> (DT.bool, Asm.Inst (Asm.OpFOrdGreaterThan id boolId e1 e2) Nothing)
+                    Ast.Ge _ -> (DT.bool, Asm.Inst (Asm.OpFOrdGreaterThanEqual id boolId e1 e2) Nothing)
               | t1 == t2 && (t1 == DT.vector2 || t1 == DT.vector3 || t1 == DT.vector4) ->
                   case op of
-                    Ast.Plus _ -> (t1, returnedInstruction id (Asm.OpFAdd typeId1 e1 e2))
-                    Ast.Minus _ -> (t1, returnedInstruction id (Asm.OpFSub typeId1 e1 e2))
-                    Ast.Times _ -> (t1, returnedInstruction id (Asm.OpFMul typeId1 e1 e2))
+                    Ast.Plus _ -> (t1, Asm.Inst (Asm.OpFAdd id typeId1 e1 e2) Nothing)
+                    Ast.Minus _ -> (t1, Asm.Inst (Asm.OpFSub id typeId1 e1 e2) Nothing)
+                    Ast.Times _ -> (t1, Asm.Inst (Asm.OpFMul id typeId1 e1 e2) Nothing)
               | (t1 == DT.vector2 || t1 == DT.vector3 || t1 == DT.vector4) && (t2 == DT.int32 || t2 == DT.float32) ->
                   case op of
-                    Ast.Times _ -> (DT.vector2, returnedInstruction id (Asm.OpVectorTimesScalar typeId1 e1 e2))
+                    Ast.Times _ -> (DT.vector2, Asm.Inst (Asm.OpVectorTimesScalar id typeId1 e1 e2) Nothing)
               | (t1 == DT.int32 || t1 == DT.float32) && (t2 == DT.vector2 || t2 == DT.vector3 || t2 == DT.vector4) ->
                   case op of
-                    Ast.Times _ -> (DT.vector2, returnedInstruction id (Asm.OpVectorTimesScalar typeId1 e1 e2))
+                    Ast.Times _ -> (DT.vector2, Asm.Inst (Asm.OpVectorTimesScalar id typeId1 e1 e2) Nothing)
             _ -> error ("Not implemented" ++ show t1 ++ show op ++ show t2)
     return ((id, resultType), inst, [instruction])
 
@@ -291,9 +291,9 @@ generateDecSt (Ast.Dec (r1, t) (Ast.Name r2 name) args e) =
 
     let funcInst =
           FunctionInst
-            { begin = [commentInstruction $ "function " ++ BS.unpack name, returnedInstruction funcId (Asm.OpFunction returnTypeId Asm.Pure typeId)]
+            { begin = [commentInstruction $ "function " ++ BS.unpack name, Asm.Inst (Asm.OpFunction funcId returnTypeId Asm.Pure typeId) Nothing]
             , parameter = paramInst
-            , label = [returnedInstruction labelId Asm.OpLabel]
+            , label = [Asm.Inst (Asm.OpLabel labelId) Nothing]
             , variable = varInst
             , body = exprInst ++ [noReturnInstruction $ Asm.OpReturnValue resultId]
             , end = [noReturnInstruction Asm.OpFunctionEnd]
@@ -313,7 +313,7 @@ generateFunctionParamSt args =
       _er <- findResultOrGenerateEntry (ResultVariable (env_s', name, dType))
       let (ExprResult (id, _)) = _er
       traceM ("generateFunctionParamSt " ++ show (env_s', name, dType))
-      let paramInst = returnedInstruction id (Asm.OpFunctionParameter typeId)
+      let paramInst = Asm.Inst (Asm.OpFunctionParameter id typeId) Nothing
       return (inst1, paramInst)
     makeAssociative (is, i) = (is, [i]) -- it's a anti-optimised move, but making less mentally taxing
    in
@@ -334,11 +334,11 @@ generateConstSt v = do
           er <- findResultOrGenerateEntry (ResultConstant v)
           let (ExprResult (constId, dType)) = er
           let constInstruction = case v of
-                Asm.LInt _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LUint _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LFloat _ -> [returnedInstruction constId (Asm.OpConstant typeId v)]
-                Asm.LBool t_f | t_f==True -> [returnedInstruction constId (Asm.OpConstantTrue typeId)]
-                Asm.LBool t_f | t_f==False-> [returnedInstruction constId (Asm.OpConstantFalse typeId)]
+                Asm.LInt _ -> [Asm.Inst (Asm.OpConstant constId typeId v) Nothing]
+                Asm.LUint _ -> [Asm.Inst (Asm.OpConstant constId typeId v) Nothing]
+                Asm.LFloat _ -> [Asm.Inst (Asm.OpConstant constId typeId v) Nothing]
+                Asm.LBool t_f | t_f==True -> [Asm.Inst (Asm.OpConstantTrue constId typeId) Nothing]
+                Asm.LBool t_f | t_f==False-> [Asm.Inst (Asm.OpConstantFalse constId typeId) Nothing]
                 _ -> error ("Not supported"++ show v)
           let inst = typeInst{typeFields = typeFields typeInst ++ constInstruction}
           return (ExprResult (constId, dtype), inst, [], [])
@@ -351,7 +351,7 @@ applyFunctionSt_aux1 (typeId, t) =
     varId <- nextOpIdName (\i -> "param_" ++ show i)
     return
       ( [(varId, t)]
-      , [returnedInstruction varId (Asm.OpVariable typeId Asm.Function)]
+      , [Asm.Inst (Asm.OpVariable varId typeId Asm.Function) Nothing]
       , [noReturnInstruction (Asm.OpStore varId (fst t))]
       )
 
@@ -365,7 +365,7 @@ functionCallSt id returnType args =
     (vars, varInst, stackInst) <- foldMaplM applyFunctionSt_aux1 $ zip typeIds args
 
     resultId <- nextOpId
-    let stackInst' = returnedInstruction resultId (Asm.OpFunctionCall searchTypeId_state0_returnType id (Asm.ShowList (map fst vars)))
+    let stackInst' = Asm.Inst (Asm.OpFunctionCall resultId searchTypeId_state0_returnType id (map fst vars)) Nothing
     -- (state', vars, typeInst, inst') = foldl (\(s, v, t, i) arg -> let (s', v', t', i') = functionPointer s arg in (s', v' : v, t ++ t', i ++ i')) (state, [], [], []) args
     -- state' = state {idCount = idCount state + 1}
     return (ExprResult (resultId, returnType), inst1, varInst, stackInst ++ [stackInst'])
@@ -375,15 +375,15 @@ handleConstructorSt returnType args =
   do
     (typeId, inst) <- generateTypeSt returnType
     returnId <- nextOpId -- handle type convert
-    let stackInst = [returnedInstruction returnId (Asm.OpCompositeConstruct typeId (Asm.ShowList (map fst args)))]
+    let stackInst = [Asm.Inst (Asm.OpCompositeConstruct returnId typeId (map fst args)) Nothing]
     return (ExprResult (returnId, returnType), inst, [], stackInst)
 
 handleExtractSt :: DataType -> [Int] -> Variable -> State LanxSt VeryImportantTuple
-handleExtractSt returnType i var@(opId, _) =
+handleExtractSt returnType is var@(opId, _) =
   do
     (typeId, inst) <- generateTypeSt returnType
     returnId <- nextOpId
-    let stackInst = [returnedInstruction returnId (Asm.OpCompositeExtract typeId opId (Asm.ShowList i))]
+    let stackInst = [Asm.Inst (Asm.OpCompositeExtract returnId typeId opId is) Nothing]
     return (ExprResult (returnId, returnType), inst, [], stackInst)
 
 ----- Below are stateless
@@ -457,21 +457,21 @@ handleIfElseSt condE thenE elseE args=
           [noReturnInstruction $ Asm.OpBranchConditional conditionId (thenLabelId) (elseLabelId)] ++ 
       -- sInst2'
           [commentInstruction "then branch"] ++
-          [returnedInstruction (thenLabelId) Asm.OpLabel] ++
+          [Asm.Inst (Asm.OpLabel thenLabelId) Nothing] ++
           stackInstThen ++
           [noReturnInstruction $ Asm.OpStore varId thenResultId] ++
           [noReturnInstruction $ Asm.OpBranch (ifThenElseEndLabelId)] ++
       -- sInst3'
           [commentInstruction "else branch"] ++
-          [returnedInstruction (elseLabelId) Asm.OpLabel] ++
+          [Asm.Inst (Asm.OpLabel elseLabelId) Nothing] ++
           stackInstElse ++
           [noReturnInstruction $ Asm.OpStore varId elseResultId] ++
           [noReturnInstruction $ Asm.OpBranch (ifThenElseEndLabelId)] ++
       --
           [commentInstruction "merged branch"] ++
-          [returnedInstruction (ifThenElseEndLabelId) Asm.OpLabel] ++
-          [returnedInstruction (finalReturnId) $ Asm.OpLoad varValueTypeId varId]
-    let varInst = varInst1 ++ varInst2 ++ varInst3 ++ [returnedInstruction varId $ Asm.OpVariable varTypeId Asm.Function]
+          [Asm.Inst (Asm.OpLabel ifThenElseEndLabelId) Nothing] ++
+          [Asm.Inst (Asm.OpLoad finalReturnId varValueTypeId varId) Nothing]
+    let varInst = varInst1 ++ varInst2 ++ varInst3 ++ [Asm.Inst (Asm.OpVariable varId varTypeId Asm.Function) Nothing]
     return (
       ExprResult (finalReturnId, returnType),
       inst1 +++ inst2 +++ inst3 +++ inst4 +++ inst5,
@@ -534,7 +534,7 @@ generateExprSt (Ast.EVar (_, t1) (Ast.Name _ bsname)) =
                 let er = fromMaybe (error (show (name, dType))) (findResult state (ResultVariable (env state, name, dType)))
                 let (ExprResult (varId, vdType)) = er
                 id <- nextOpId
-                let stackInst = [returnedInstruction id (Asm.OpLoad (searchTypeId state vdType) varId)]
+                let stackInst = [Asm.Inst (Asm.OpLoad id (searchTypeId state vdType) varId) Nothing]
                 return (ExprResult (id, vdType), mempty, [], stackInst)
 
 generateExprSt (Ast.EString _ _) = error "String"

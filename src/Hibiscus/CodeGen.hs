@@ -34,7 +34,7 @@ generateInitSt cfg decs =
     let headInstruction =
           HeaderFields
             { capabilityInst = Just $ noReturnInstruction $ Asm.OpCapability (capability cfg)
-            , extensionInst = Just $ returnedInstruction (Asm.Id $ startId + 1) (Asm.OpExtInstImport (extension cfg))
+            , extensionInst = Just $ Asm.Inst (Asm.OpExtInstImport (Asm.Id $ startId + 1) (extension cfg)) Nothing
             , memoryModelInst = Just $ noReturnInstruction $ Asm.OpMemoryModel (addressModel cfg) (memoryModel cfg)
             , entryPointInst = Nothing
             , executionModeInst = Just $ noReturnInstruction $ Asm.OpExecutionMode (Asm.IdName . entryPoint $ cfg) (executionMode cfg)
@@ -67,7 +67,7 @@ generateUniformsSt_aux1 (name, dType, storage, location) =
     _er <- findResultOrGenerateEntry (ResultVariable (env_s1, name, dType))
     let ExprResult (id, _) = _er
 
-    let variableInstruction = [returnedInstruction id (Asm.OpVariable typeId storage)]
+    let variableInstruction = [Asm.Inst (Asm.OpVariable id typeId storage) Nothing]
     let nameInstruction = [noReturnInstruction (Asm.OpName id name)]
     let uniformsInstruction = [noReturnInstruction (Asm.OpDecorate id (Asm.Location location))]
 
@@ -92,7 +92,7 @@ generateUniformsSt cfg args =
       (inst, ids) <- foldMaplM generateUniformsSt_aux1 uniforms'
 
       let hf = headerFields inst
-      let hf' = hf{entryPointInst = Just $ noReturnInstruction (Asm.OpEntryPoint shaderTypeOfCfg (Asm.IdName entryPointOfCfg) entryPointOfCfg (Asm.ShowList ids))}
+      let hf' = hf{entryPointInst = Just $ noReturnInstruction (Asm.OpEntryPoint shaderTypeOfCfg (Asm.IdName entryPointOfCfg) entryPointOfCfg ids)}
       let inst1 = inst{headerFields = hf'}
 
       return inst1
@@ -124,9 +124,9 @@ generateMainFunctionSt inst cfg (Ast.Dec (_, t) (Ast.Name _ name) args e) =
 
     let funcInst =
           FunctionInst
-            { begin = [commentInstruction $ "function " ++ BS.unpack name, returnedInstruction funcId (Asm.OpFunction returnTypeId Asm.None typeId)]
+            { begin = [commentInstruction $ "function " ++ BS.unpack name, Asm.Inst (Asm.OpFunction funcId returnTypeId Asm.None typeId) Nothing]
             , parameter = []
-            , label = [returnedInstruction labelId Asm.OpLabel]
+            , label = [Asm.Inst (Asm.OpLabel labelId) Nothing]
             , variable = varInst
             , body = exprInst ++ saveInst ++ [noReturnInstruction Asm.OpReturn]
             , end = [noReturnInstruction Asm.OpFunctionEnd]

@@ -1,13 +1,12 @@
+-- FIXME: WIP
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
-{-# OPTIONS_GHC -w #-}
 
 module Hibiscus.Asm
   ( Instruction (..),
     Literal (..),
-    Ops (..),
+    Op (..),
     OpId (..),
-    ShowList (..),
     Capability (..),
     AddressingModel (..),
     SourceLanguage (..),
@@ -18,8 +17,23 @@ module Hibiscus.Asm
     ExecutionModel (..),
     ExecutionMode (..),
     ResultId,
-  )
-where
+    Emit (..),
+    )
+  where
+
+import Hibiscus.CodeGen.Emit (Emit, emit)
+import Hibiscus.CodeGen.TH.EmitOp (mkOpAndEmit)
+-- import Text.Show.Deriving (deriveShow)
+
+
+instance Emit Char where -- for String
+  emit = show
+instance Emit Int where
+  emit = show
+instance Emit (Int, OpId) where
+  emit (x, y) = "(" ++ emit x ++ "," ++ emit y ++ ")"
+instance (Emit a) => Emit [a] where
+  emit = unwords . map emit -- join strings with space
 
 data Literal
   = LBool Bool
@@ -28,40 +42,34 @@ data Literal
   | LFloat Float
   deriving (Show, Eq, Ord)
 
+instance Emit Literal where
+  emit = show
+
 data OpId
   = IdName String
   | Id Int
+  deriving (Show)
 
--- TODO: Improve type safety of OpId
-type TypeId = OpId
-type LabelId = OpId
-type ValueId = OpId
-type FunctionId = OpId
-type PointerId = OpId
-
-instance Show OpId where
-  show (IdName s) = "%" ++ s
-  show (Id i) = "%" ++ show i
-
-type ResultType = OpId
-
-newtype ShowList a = ShowList [a]
-
-instance (Show a) => Show (ShowList a) where
-  show (ShowList l) = unwords $ map show l -- join strings with space
-
-type ResultId = OpId
+instance Emit OpId where
+  emit (IdName s) = "%" ++ s
+  emit (Id i) = "%" ++ emit i
 
 data Capability
   = Matrix
   | Shader
   deriving (Show)
 
+instance Emit Capability where
+  emit = show
+
 data SourceLanguage
   = Unknown
   | HLSL
   | GLSL
   deriving (Show)
+
+instance Emit SourceLanguage where
+  emit = show
 
 data StorageClass
   = Function
@@ -76,6 +84,9 @@ data StorageClass
   | Pointer
   deriving (Show, Eq, Ord)
 
+instance Emit StorageClass where
+  emit = show
+
 data ExecutionModel
   = Vertex
   | TessellationControl
@@ -86,23 +97,30 @@ data ExecutionModel
   | Kernel
   deriving (Show)
 
+instance Emit ExecutionModel where
+  emit = show
+
 data ExecutionMode
   = Invocations Int
   | OriginUpperLeft
   | OriginLowerLeft
   deriving (Show)
 
+instance Emit ExecutionMode where
+  emit = show
+
 data Decoration
   = RelaxedPrecision
   | SpecId Int
   | Block
   | Location Int
+  deriving (Show)
 
-instance Show Decoration where
-  show RelaxedPrecision = "RelaxedPrecision"
-  show (SpecId i) = "SpecId " ++ show i
-  show Block = "Block"
-  show (Location i) = "Location " ++ show i
+instance Emit Decoration where
+  emit RelaxedPrecision = "RelaxedPrecision"
+  emit (SpecId i) = "SpecId " ++ show i
+  emit Block = "Block"
+  emit (Location i) = "Location " ++ show i
 
 data FunctionControl
   = None
@@ -112,11 +130,17 @@ data FunctionControl
   | Const
   deriving (Show)
 
+instance Emit FunctionControl where
+  emit = show
+
 data AddressingModel
   = Logical
   | Physical32
   | Physical64
   deriving (Show)
+
+instance Emit AddressingModel where
+  emit = show
 
 data MemoryModel
   = Simple
@@ -125,155 +149,189 @@ data MemoryModel
   | Vulkan
   deriving (Show)
 
-data Ops
+instance Emit MemoryModel where
+  emit = show
+
+type ResultId = OpId
+type ResultType = OpId
+
+type TypeId = OpId
+type LabelId = OpId
+type ValueId = OpId
+type FunctionId = OpId
+type PointerId = OpId
+
+-- FIXME: Returned Op
+-- NOTE: X_ is for Template Haskell
+--         T_ just to avoid multipled define
+--         N_ means no returned
+--         R_ means returned.
+--       will be removed by TH
+data T_Op
   = -- OpMiscellaneous
-    OpNop
-  | OpUndef ResultType
-  | OpSourceContinued String
-  | OpSource SourceLanguage Int
-  | OpSourceExtension String
-  | OpName OpId String
-  | OpMemberName OpId Int String
-  | OpString OpId String
-  | OpLine Int Int
-  | OpNoLine
+    N_OpNop
+  | R_OpUndef ResultId ResultType
+  | N_OpSourceContinued String
+  | N_OpSource SourceLanguage Int
+  | N_OpSourceExtension String
+  | N_OpName OpId String
+  | N_OpMemberName OpId Int String
+  | N_OpString OpId String
+  | N_OpLine Int Int
+  | N_OpNoLine
   | -- OpAnnotation
-    OpDecorate OpId Decoration
-  | OpMemberDecorateStringGO OpId Int Decoration String
+    N_OpDecorate OpId Decoration
+  | N_OpMemberDecorateStringGO OpId Int Decoration String
   | -- OpExtension
-    OpExtension String
-  | OpExtInstImport String
-  | OpExtInst OpId OpId (ShowList OpId)
+    N_OpExtension String
+  | R_OpExtInstImport ResultId String
+  | N_OpExtInst OpId OpId [OpId]
   | -- OpModeSetting
-    OpMemoryModel AddressingModel MemoryModel
-  | OpEntryPoint ExecutionModel OpId String (ShowList OpId)
-  | OpExecutionMode OpId ExecutionMode
-  | OpCapability Capability
+    N_OpMemoryModel AddressingModel MemoryModel
+  | N_OpEntryPoint ExecutionModel OpId String [OpId]
+  | N_OpExecutionMode OpId ExecutionMode
+  | N_OpCapability Capability
   | -- OpTypeDeclaration
-    OpTypeVoid
-  | OpTypeBool
-  | OpTypeInt Int Int -- bit width  , 0 indicates unsigned,1 indicates signed semantics.
-  | OpTypeFloat Int -- bit width
-  | OpTypeVector TypeId Int -- component count
-  | OpTypeMatrix TypeId Int -- vectorTypeId column count
-  | OpTypeArray TypeId ValueId -- data type id
-  | OpTypeStruct (ShowList TypeId) -- data types id
-  | OpTypePointer StorageClass TypeId
-  | OpTypeFunction TypeId (ShowList TypeId) -- data types id
+    R_OpTypeVoid ResultId
+  | R_OpTypeBool ResultId
+  | R_OpTypeInt ResultId Int Int -- bit width  , 0 indicates unsigned,1 indicates signed semantics.
+  | R_OpTypeFloat ResultId Int -- bit width
+  | R_OpTypeVector ResultId TypeId Int -- component count
+  | R_OpTypeMatrix ResultId TypeId Int -- vectorTypeId column count
+  | R_OpTypeArray ResultId TypeId ValueId -- data type id
+  | R_OpTypeStruct ResultId [TypeId] -- data types id
+  | R_OpTypePointer ResultId StorageClass TypeId
+  | R_OpTypeFunction ResultId TypeId [TypeId] -- data types id
   | -- OpConstant
-    OpConstantTrue ResultType
-  | OpConstantFalse ResultType
-  | OpConstant ResultType Literal
-  | OpConstantComposite ResultType (ShowList OpId)
-  | OpConstantSampler ResultType Int Int
-  | OpConstantNull ResultType
+    R_OpConstantTrue ResultId ResultType
+  | R_OpConstantFalse ResultId ResultType
+  | R_OpConstant ResultId ResultType Literal
+  | R_OpConstantComposite ResultId ResultType [OpId]
+  | R_OpConstantSampler ResultId ResultType Int Int
+  | R_OpConstantNull ResultId ResultType
   | -- OpMemory
-    OpVariable TypeId StorageClass
-  | OpLoad TypeId PointerId
-  | OpStore PointerId ValueId
+    R_OpVariable ResultId TypeId StorageClass
+  | R_OpLoad ResultId TypeId PointerId
+  | N_OpStore PointerId ValueId
   | -- OpFunction
-    OpFunction ResultType FunctionControl TypeId
-  | OpFunctionParameter ResultType
-  | OpFunctionEnd
-  | OpFunctionCall ResultType FunctionId (ShowList PointerId)
+    R_OpFunction ResultId ResultType FunctionControl TypeId
+  | R_OpFunctionParameter ResultId ResultType
+  | N_OpFunctionEnd
+  | R_OpFunctionCall ResultId ResultType FunctionId [PointerId]
   | -- OpConversion
-    OpConvertFToU ResultType ValueId -- float to unsigned int
-  | OpConvertFToS ResultType ValueId -- float to signed int
-  | OpConvertSToF ResultType ValueId -- signed int to float
-  | OpConvertUToF ResultType ValueId -- unsigned int to float
-  | OpUConvert ResultType ValueId -- unsigned int to unsigned int
-  | OpSConvert ResultType ValueId -- signed int to signed int
-  | OpFConvert ResultType ValueId -- float to float
-  | OpBitcast ResultType ValueId
+    R_OpConvertFToU ResultId ResultType ValueId -- float to unsigned int
+  | R_OpConvertFToS ResultId ResultType ValueId -- float to signed int
+  | R_OpConvertSToF ResultId ResultType ValueId -- signed int to float
+  | R_OpConvertUToF ResultId ResultType ValueId -- unsigned int to float
+  | R_OpUConvert ResultId ResultType ValueId -- unsigned int to unsigned int
+  | R_OpSConvert ResultId ResultType ValueId -- signed int to signed int
+  | R_OpFConvert ResultId ResultType ValueId -- float to float
+  | R_OpBitcast ResultId ResultType ValueId
   | -- OpComposite
-    OpCompositeConstruct ResultType (ShowList ValueId)
-  | OpCompositeExtract ResultType ValueId (ShowList Int)
-  | OpCompositeInsert ResultType ValueId ValueId (ShowList ValueId)
+    R_OpCompositeConstruct ResultId ResultType [ValueId]
+  | R_OpCompositeExtract ResultId ResultType ValueId [Int]
+  | R_OpCompositeInsert ResultId ResultType ValueId ValueId [ValueId]
   | -- OpArithmetic
-    OpSNegate ResultType ValueId
-  | OpFNegate ResultType ValueId
-  | OpIAdd ResultType ValueId ValueId
-  | OpISub ResultType ValueId ValueId
-  | OpIMul ResultType ValueId ValueId
-  | OpUDiv ResultType ValueId ValueId -- unsigned division
-  | OpSDiv ResultType ValueId ValueId -- signed division
-  | OpUMod ResultType ValueId ValueId -- unsigned modulo
-  | OpSMod ResultType ValueId ValueId -- signed modulo
-  | OpFAdd ResultType ValueId ValueId -- float
-  | OpFSub ResultType ValueId ValueId
-  | OpFMul ResultType ValueId ValueId
-  | OpFDiv ResultType ValueId ValueId
-  | OpFMod ResultType ValueId ValueId
-  | OpFRem ResultType ValueId ValueId
-  | OpVectorTimesScalar ResultType ValueId ValueId
-  | OpVectorTimesMatrix ResultType ValueId ValueId
-  | OpMatrixTimesScalar ResultType ValueId ValueId
-  | OpMatrixTimesVector ResultType ValueId ValueId
-  | OpMatrixTimesMatrix ResultType ValueId ValueId
+    R_OpSNegate ResultId ResultType ValueId
+  | R_OpFNegate ResultId ResultType ValueId
+  | R_OpIAdd ResultId ResultType ValueId ValueId
+  | R_OpISub ResultId ResultType ValueId ValueId
+  | R_OpIMul ResultId ResultType ValueId ValueId
+  | R_OpUDiv ResultId ResultType ValueId ValueId -- unsigned division
+  | R_OpSDiv ResultId ResultType ValueId ValueId -- signed division
+  | R_OpUMod ResultId ResultType ValueId ValueId -- unsigned modulo
+  | R_OpSMod ResultId ResultType ValueId ValueId -- signed modulo
+  | R_OpFAdd ResultId ResultType ValueId ValueId -- float
+  | R_OpFSub ResultId ResultType ValueId ValueId
+  | R_OpFMul ResultId ResultType ValueId ValueId
+  | R_OpFDiv ResultId ResultType ValueId ValueId
+  | R_OpFMod ResultId ResultType ValueId ValueId
+  | R_OpFRem ResultId ResultType ValueId ValueId
+  | R_OpVectorTimesScalar ResultId ResultType ValueId ValueId
+  | R_OpVectorTimesMatrix ResultId ResultType ValueId ValueId
+  | R_OpMatrixTimesScalar ResultId ResultType ValueId ValueId
+  | R_OpMatrixTimesVector ResultId ResultType ValueId ValueId
+  | R_OpMatrixTimesMatrix ResultId ResultType ValueId ValueId
   | -- OpLogical
-    OpLogicalEqual ResultType ValueId ValueId
-  | OpLogicalNotEqual ResultType ValueId ValueId
-  | OpLogicalOr ResultType ValueId ValueId
-  | OpLogicalAnd ResultType ValueId ValueId
-  | OpLogicalNot ResultType ValueId
-  | OpLogicalXor ResultType ValueId ValueId
-  | OpIEqual ResultType ValueId ValueId -- int
-  | OpINotEqual ResultType ValueId ValueId
-  | OpUGreaterThan ResultType ValueId ValueId
-  | OpSGreaterThan ResultType ValueId ValueId
-  | OpUGreaterThanEqual ResultType ValueId ValueId
-  | OpSGreaterThanEqual ResultType ValueId ValueId
-  | OpULessThan ResultType ValueId ValueId
-  | OpSLessThan ResultType ValueId ValueId
-  | OpULessThanEqual ResultType ValueId ValueId
-  | OpSLessThanEqual ResultType ValueId ValueId
-  | OpFOrdEqual ResultType ValueId ValueId -- float
-  | OpFUnordEqual ResultType ValueId ValueId
-  | OpFOrdNotEqual ResultType ValueId ValueId
-  | OpFUnordNotEqual ResultType ValueId ValueId
-  | OpFOrdLessThan ResultType ValueId ValueId
-  | OpFUnordLessThan ResultType ValueId ValueId
-  | OpFOrdGreaterThan ResultType ValueId ValueId
-  | OpFUnordGreaterThan ResultType ValueId ValueId
-  | OpFOrdLessThanEqual ResultType ValueId ValueId
-  | OpFUnordLessThanEqual ResultType ValueId ValueId
-  | OpFOrdGreaterThanEqual ResultType ValueId ValueId
-  | OpFUnordGreaterThanEqual ResultType ValueId ValueId
+    R_OpLogicalEqual ResultId ResultType ValueId ValueId
+  | R_OpLogicalNotEqual ResultId ResultType ValueId ValueId
+  | R_OpLogicalOr ResultId ResultType ValueId ValueId
+  | R_OpLogicalAnd ResultId ResultType ValueId ValueId
+  | R_OpLogicalNot ResultId ResultType ValueId
+  | R_OpLogicalXor ResultId ResultType ValueId ValueId
+  | R_OpIEqual ResultId ResultType ValueId ValueId -- int
+  | R_OpINotEqual ResultId ResultType ValueId ValueId
+  | R_OpUGreaterThan ResultId ResultType ValueId ValueId
+  | R_OpSGreaterThan ResultId ResultType ValueId ValueId
+  | R_OpUGreaterThanEqual ResultId ResultType ValueId ValueId
+  | R_OpSGreaterThanEqual ResultId ResultType ValueId ValueId
+  | R_OpULessThan ResultId ResultType ValueId ValueId
+  | R_OpSLessThan ResultId ResultType ValueId ValueId
+  | R_OpULessThanEqual ResultId ResultType ValueId ValueId
+  | R_OpSLessThanEqual ResultId ResultType ValueId ValueId
+  | R_OpFOrdEqual ResultId ResultType ValueId ValueId -- float
+  | R_OpFUnordEqual ResultId ResultType ValueId ValueId
+  | R_OpFOrdNotEqual ResultId ResultType ValueId ValueId
+  | R_OpFUnordNotEqual ResultId ResultType ValueId ValueId
+  | R_OpFOrdLessThan ResultId ResultType ValueId ValueId
+  | R_OpFUnordLessThan ResultId ResultType ValueId ValueId
+  | R_OpFOrdGreaterThan ResultId ResultType ValueId ValueId
+  | R_OpFUnordGreaterThan ResultId ResultType ValueId ValueId
+  | R_OpFOrdLessThanEqual ResultId ResultType ValueId ValueId
+  | R_OpFUnordLessThanEqual ResultId ResultType ValueId ValueId
+  | R_OpFOrdGreaterThanEqual ResultId ResultType ValueId ValueId
+  | R_OpFUnordGreaterThanEqual ResultId ResultType ValueId ValueId
   | -- OpControlFlow
-    OpLabel
-  | OpBranch LabelId
-  | OpBranchConditional ValueId LabelId LabelId
-  | OpSelectionMerge LabelId FunctionControl
-  | OpSwitch OpId OpId [(Int, OpId)]
-  | OpKill
-  | OpReturn
-  | OpReturnValue ValueId
-  | OpUnreachable
-  | Comment String
+    N_OpLabel LabelId
+  | N_OpBranch LabelId
+  | N_OpBranchConditional ValueId LabelId LabelId
+  | N_OpSelectionMerge LabelId FunctionControl
+  | N_OpSwitch OpId OpId [(Int, OpId)]
+  | N_OpKill
+  | N_OpReturn
+  | N_OpReturnValue ValueId
+  | N_OpUnreachable
   deriving (Show)
 
-newtype Instruction = Instruction (Maybe ResultId, Ops)
+$(mkOpAndEmit ''T_Op)
+-- $(deriveShow ''Op)
+instance Show Op where
+  show = emit
 
-instance Show Instruction where
-  show (Instruction (_, Comment s)) = "; " ++ s
-  show (Instruction (Just res, OpConstant r l)) =
-    show res
-      ++ " = "
-      ++ "OpConstant "
-      ++ show r
-      ++ " "
-      ++ ( case l of
-             LBool b -> show b
-             LUint i -> show i
-             LInt i -> show i
-             LFloat f -> show f
-         )
-  show (Instruction (Nothing, op)) = show op
-  show (Instruction (Just res, op)) = show res ++ " = " ++ show op
+type CommentStr = String
 
-test :: () -> [Instruction]
-test () =
-  [ Instruction (Nothing, OpTypeFloat 8),
-    Instruction (Just (IdName "name"), OpTypeInt 32 0),
-    Instruction (Just (Id 2), OpTypeInt 16 1)
-  ]
+data Instruction = Inst Op (Maybe CommentStr)
+                 | Comment CommentStr
+  deriving (Show)
+
+instance Emit Instruction where
+  emit (Inst op maybeComment) = emit op ++ (maybe "" show maybeComment)
+  emit (Comment s) = "; " ++ s
+
+-- data FunctionInst = FunctionInst
+--   { begin :: [Asm.Instruction]
+--   , parameter :: [Asm.Instruction] 
+--    --  %4 = OpFunction %2 None %3                  ; main()
+--   , label :: [Asm.Instruction]
+--    --  %5 = OpLabel
+--   , variable :: [Asm.Instruction]
+--    --  %9 = OpVariable %8 Function
+--    -- %48 = OpVariable %47 Function
+--   , body :: [Asm.Instruction]
+--    -- ...
+--   --, end :: [Asm.Instruction] -- move to printer
+--    --       OpFunctionEnd
+--   }
+--   deriving (Show)
+
+-- toInstruction :: FunctionInst -> [FunctionInst]
+-- toInstruction (FunctionInst header param )
+
+-- data WholeTheFile = WTF
+--   { headerFields :: HeaderFields -- HACK: Maybe
+--   , nameFields :: [Instruction]
+--   , uniformsFields :: [Instruction] -- Annote I/O
+--   , typeFields :: [Instruction] -- declare type
+--   , functionFields :: [FunctionInst] -- All functions
+--   }
+--   deriving (Show)
